@@ -2,7 +2,7 @@
 name = "hbn-postprocessing"
 version = "0.1.0"
 description = "Postprocessing workflow for HBN data"
-authors = ["Tristan Kuehn <tkuehn@uwo.ca>"]
+authors = ["Tristan Kuehn <tkuehn@uwo.ca>", "Jessica Lammert <jlammert@uwo.ca>"]
 readme = "README.md"
 packages = [{include = "hbn_postprocessing"}]
 
@@ -17,6 +17,9 @@ black = "^23.3.0"
 pyright = "^1.1.307"
 snakefmt = "^0.8.4"
 pandas-stubs = "^2.0.1.230501"
+
+[tool.poetry.scripts]
+hbn_postprocess = "hbn_postprocessing.main:main"
 
 [tool.pyright]
 typeCheckingMode = "strict"
