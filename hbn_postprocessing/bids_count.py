@@ -5,6 +5,7 @@ from __future__ import annotations
 import glob
 import os
 import re
+from argparse import ArgumentParser
 from collections.abc import Callable
 from dataclasses import dataclass
 from itertools import chain
@@ -80,13 +81,44 @@ def count_files(bids_dir: os.PathLike[str] | str, subj_id: str) -> dict[str, int
     return sub_dict
 
 
+def count_all_files(
+    bids_dir: os.PathLike[str] | str,
+    out_dir: os.PathLike[str] | str,
+) -> None:
+    """Write CSVs with relevant image counts."""
+    bids_path = Path(bids_dir)
+    file_count_df = pd.DataFrame(
+        [
+            count_files(bids_path, sub_dir.name.split("-")[1])
+            for sub_dir in glob_dir(
+                bids_path,
+                "sub-*",
+                filter_=lambda path: path.is_dir(),
+            )
+        ],
+    )
+    out_path = Path(out_dir)
+    file_count_df.to_csv(out_path / "BIDS-count_all.csv", sep=",", index=False)
+    exclude_df = file_count_df.loc[
+        lambda df: (df["t1_files"] == 0) | (df["fmap_files"] == 0),
+        :,
+    ]
+    exclude_df.to_csv(out_path / "BIDS-count_exclude.csv", sep=",", index=False)
+    file_count_df.loc[lambda df: ~df["id"].isin(exclude_df["id"]), :].to_csv(
+        out_path / "BIDS-count_include.csv",
+        sep=",",
+        index=False,
+    )
+
+
 def check_html(
     fmriprep_out_dir: os.PathLike[str] | str,
-    participants: pd.DataFrame,
+    participants_path: os.PathLike[str] | str,
     out_dir: os.PathLike[str] | str,
 ) -> None:
     """Write a set of summary CSVs checking if participants have an HTML file."""
     html_files = {file_.stem for file_ in glob_dir(fmriprep_out_dir, "*.html*")}
+    participants = pd.read_csv(participants_path)
     matches = participants.assign(
         html=participants["participant_id"]
         .isin(html_files)
@@ -182,7 +214,7 @@ def get_framewise_displacement(
         if not match:
             raise ValueError
         task = match.group("task")
-        run = f"_{match.group('run')}" if match.group("run") else ""
+        run = f"_run-{match.group('run')}" if match.group("run") else ""
         task_run = f"{task}{run}"
         data = pd.read_csv(tsv, sep="\t", header=0)
         sub_dict[task_run] = data["framewise_displacement"].tail(-1).mean()
@@ -190,7 +222,8 @@ def get_framewise_displacement(
 
 
 def exclude_by_motion(
-    bids_dir: os.PathLike[str] | str, out_dir: os.PathLike[str] | str,
+    bids_dir: os.PathLike[str] | str,
+    out_dir: os.PathLike[str] | str,
 ) -> None:
     """Find outliers by framewise displacement per task."""
     subj_dirs = glob_dir(bids_dir, "sub*", filter_=lambda path: path.is_dir())
@@ -201,15 +234,41 @@ def exclude_by_motion(
     group_sds = displacement_df.iloc[:, 1:].mean(axis=0)
     upper_lims = group_fds + (2 * group_sds)
     for task_run in set(displacement_df.columns) - {"id"}:
-        displacement_df.assign(
+        displacement_df = displacement_df.assign(
             **{
                 f"{task_run}_is_outlier": displacement_df[task_run]
                 > upper_lims[task_run],
             },
         )
-        displacement_df.drop(task_run, axis=1)
+        displacement_df = displacement_df.drop(task_run, axis=1)
     displacement_df.to_csv(
         Path(out_dir) / "motion-outliers_all.csv",
         sep=",",
         index=False,
     )
+
+
+def gen_parser() -> ArgumentParser:
+    """Generate the parser to use for this app."""
+    parser = ArgumentParser()
+    parser.add_argument("bids_dir", help="Raw BIDS directory")
+    parser.add_argument("fmriprep_dir", help="fmriprep output dir")
+    parser.add_argument("jobs_dir", help="Directory with .out files")
+    parser.add_argument("out_dir", help="Output directory")
+    return parser
+
+
+def main() -> None:
+    """Run all relevant tasks."""
+    args = gen_parser().parse_args()
+
+    count_all_files(args.bids_dir, args.out_dir)
+    check_html(
+        args.fmriprep_dir, Path(args.bids_dir) / "participants.tsv", args.out_dir,
+    )
+    check_jobs(args.jobs_dir, args.out_dir)
+    exclude_by_motion(args.fmriprep_dir, args.out_dir)
+
+
+if __name__ == "__main__":
+    main()
