@@ -40,7 +40,7 @@ def main() -> None:
 
     subjects = read_subject_list(args.subject_list) if args.subject_list else None
 
-    count_all_files(args.bids_dir, args.out_dir)
+    count_all_files(args.bids_dir, args.out_dir, subjects)
     check_html(
         args.fmriprep_dir,
         Path(args.bids_dir) / "participants.tsv",

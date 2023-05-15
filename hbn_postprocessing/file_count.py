@@ -1,12 +1,17 @@
 """Tools to count relevant files in the source directory."""
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
+from logging import getLogger
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
 from hbn_postprocessing.utils import glob_dir
+
+logger = getLogger(__name__)
 
 
 @dataclass
@@ -53,19 +58,35 @@ def count_files(bids_dir: os.PathLike[str] | str, subj_id: str) -> dict[str, int
 def count_all_files(
     bids_dir: os.PathLike[str] | str,
     out_dir: os.PathLike[str] | str,
+    subjects: Iterable[str] | None,
 ) -> None:
     """Write CSVs with relevant image counts."""
     bids_path = Path(bids_dir)
+    subj_dicts = [
+        count_files(bids_path, sub_dir.name.split("-")[1])
+        for sub_dir in glob_dir(
+            bids_path,
+            "sub-*",
+            filter_=lambda path: path.is_dir(),
+        )
+    ]
+    if subjects:
+        missing_subjects = set(subjects) - {
+            cast(str, subj_dict["id"]) for subj_dict in subj_dicts
+        }
+        if missing_subjects:
+            logger.warning(
+                "Requested subject(s) %s not found in raw BIDS dir",
+                missing_subjects,
+            )
     file_count_df = pd.DataFrame(
         [
-            count_files(bids_path, sub_dir.name.split("-")[1])
-            for sub_dir in glob_dir(
-                bids_path,
-                "sub-*",
-                filter_=lambda path: path.is_dir(),
-            )
+            subj_dict
+            for subj_dict in subj_dicts
+            if (subjects and (cast(str, subj_dict["id"]) in subjects))
         ],
     )
+
     out_path = Path(out_dir)
     file_count_df.to_csv(out_path / "BIDS-count_all.csv", sep=",", index=False)
     exclude_df = file_count_df.loc[
