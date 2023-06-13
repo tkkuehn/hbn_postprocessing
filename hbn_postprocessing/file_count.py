@@ -39,7 +39,7 @@ def count_files(bids_dir: os.PathLike[str] | str, subj_id: str) -> dict[str, int
     """Count the T1w, bold, and fMRI_epi files for the subject."""
     subj_dir = Path(bids_dir) / f"sub-{subj_id}"
     content = glob_dir(subj_dir, "*", filter_=lambda path: path.is_dir())
-    sub_dict: dict[str, int | str] = {"id": subj_id}
+    sub_dict: dict[str, int | str] = {"participant_id": f"sub-{subj_id}"}
 
     for datatype_dir in content:
         datatype = datatype_dir.name
@@ -53,28 +53,35 @@ def count_files(bids_dir: os.PathLike[str] | str, subj_id: str) -> dict[str, int
 def count_all_files(
     bids_dir: os.PathLike[str] | str,
     out_dir: os.PathLike[str] | str,
-) -> None:
+) -> pd.DataFrame:
     """Write CSVs with relevant image counts."""
     bids_path = Path(bids_dir)
-    file_count_df = pd.DataFrame(
-        [
-            count_files(bids_path, sub_dir.name.split("-")[1])
-            for sub_dir in glob_dir(
-                bids_path,
-                "sub-*",
-                filter_=lambda path: path.is_dir(),
-            )
-        ],
+    file_count_df = (
+        pd.DataFrame(
+            [
+                count_files(bids_path, sub_dir.name.split("-")[1])
+                for sub_dir in glob_dir(
+                    bids_path,
+                    "sub-*",
+                    filter_=lambda path: path.is_dir(),
+                )
+            ],
+        )
+        .astype({"participant_id": pd.StringDtype()})
+        .set_index("participant_id")
     )
     out_path = Path(out_dir)
-    file_count_df.to_csv(out_path / "BIDS-count_all.csv", sep=",", index=False)
+    file_count_df.to_csv(out_path / "BIDS-count_all.csv", sep=",")
     exclude_df = file_count_df.loc[
         lambda df: (df["t1_files"] == 0) | (df["fmap_files"] == 0),
         :,
     ]
-    exclude_df.to_csv(out_path / "BIDS-count_exclude.csv", sep=",", index=False)
-    file_count_df.loc[lambda df: ~df["id"].isin(exclude_df["id"]), :].to_csv(
+    exclude_df.to_csv(out_path / "BIDS-count_exclude.csv", sep=",")
+    file_count_df.loc[
+        lambda df: ~df.index.isin(exclude_df.index),
+        :,
+    ].to_csv(
         out_path / "BIDS-count_include.csv",
         sep=",",
-        index=False,
     )
+    return file_count_df

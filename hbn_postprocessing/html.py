@@ -12,17 +12,20 @@ def check_html(
     fmriprep_out_dir: os.PathLike[str] | str,
     participants_path: os.PathLike[str] | str,
     out_dir: os.PathLike[str] | str,
-) -> None:
+) -> pd.DataFrame:
     """Write a set of summary CSVs checking if participants have an HTML file."""
     html_files = {file_.stem for file_ in glob_dir(fmriprep_out_dir, "*.html*")}
-    participants = pd.read_csv(participants_path)
+    participants = (
+        pd.read_csv(participants_path)
+        .astype({"participant_id": pd.StringDtype()})
+    )
     matches = participants.assign(
         html=participants["participant_id"]
         .isin(html_files)
         .replace([True, False], ["yes", "no"]),
-    )
+    ).set_index("participant_id")
     out_path = Path(out_dir)
-    matches.to_csv(out_path / "html-check_all.csv", sep=",", index=False)
+    matches.to_csv(out_path / "html-check_all.csv", sep=",")
     matches[matches["html"] == "no"].to_csv(
         out_path / "html-check_no.csv",
         sep=",",
@@ -33,3 +36,4 @@ def check_html(
         sep=",",
         index=False,
     )
+    return matches

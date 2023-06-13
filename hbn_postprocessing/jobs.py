@@ -8,7 +8,7 @@ import pandas as pd
 from hbn_postprocessing.utils import glob_dir
 
 STARTED_THRESHOLD_KB = 10
-COMPLETED_THRESHOLD_KB = 400
+COMPLETED_THRESHOLD_KB = 4000
 
 
 def _process_job_file(file_: Path) -> dict[str, str | float]:
@@ -22,21 +22,24 @@ def _process_job_file(file_: Path) -> dict[str, str | float]:
 def check_jobs(
     jobs_dir: os.PathLike[str] | str,
     out_dir: os.PathLike[str] | str,
-) -> None:
+) -> pd.DataFrame:
     """Parse a dir of ".out" files to check for incomplete jobs."""
     out_files = glob_dir(jobs_dir, "*.out*")
     file_info = [_process_job_file(file_) for file_ in out_files]
-    size_df = pd.DataFrame(
-        {
-            "file_name": [file_["name"] for file_ in file_info],
-            "p_id": [file_["p_id"] for file_ in file_info],
-            "size_kb": [file_["size_kb"] for file_ in file_info],
-        },
-    ).loc[lambda df: df["p_id"].str.startswith("NDA"), :]
+    size_df = (
+        pd.DataFrame(
+            {
+                "file_name": [file_["name"] for file_ in file_info],
+                "participant_id": [f'sub-{file_["p_id"]}' for file_ in file_info],
+                "size_kb": [file_["size_kb"] for file_ in file_info],
+            },
+        )
+        .astype({"participant_id": pd.StringDtype()})
+        .loc[lambda df: df["participant_id"].str.startswith("sub-NDA"), :]
+    )
     max_size = (
-        size_df.groupby("p_id")
+        size_df.groupby("participant_id")
         .max()
-        .reset_index()
         .assign(
             status=lambda df: df.size_kb.map(
                 lambda size_kb: "not started"
@@ -55,10 +58,9 @@ def check_jobs(
     max_size.loc[max_size.status != "likely_complete", :].to_csv(
         out_path / "out-size_incomp.csv",
         sep=",",
-        index=False,
     )
     max_size.loc[max_size.status == "likely complete", :].to_csv(
         out_path / "out-size_comp.csv",
         sep=",",
-        index=False,
     )
+    return max_size

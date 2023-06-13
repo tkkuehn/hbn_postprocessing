@@ -25,14 +25,20 @@ def main() -> None:
     """Run all relevant tasks."""
     args = gen_parser().parse_args()
 
-    count_all_files(args.bids_dir, args.out_dir)
-    check_html(
+    file_count_df = count_all_files(args.bids_dir, args.out_dir)
+    html_check_df = check_html(
         args.fmriprep_dir,
         Path(args.bids_dir) / "participants.tsv",
         args.out_dir,
     )
-    check_jobs(args.jobs_dir, args.out_dir)
-    exclude_by_motion(args.fmriprep_dir, args.out_dir)
+    out_size_df = check_jobs(args.jobs_dir, args.out_dir)
+    motion_outliers_df = exclude_by_motion(args.fmriprep_dir, args.out_dir)
+    file_count_df.join(
+        [html_check_df, out_size_df, motion_outliers_df], how="outer",
+    ).to_csv(
+        Path(args.out_dir) / "overall_summary.csv",
+        sep=",",
+    )
 
 
 if __name__ == "__main__":

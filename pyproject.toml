@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hbn-postprocessing"
-version = "0.1.0"
+version = "0.2.0"
 description = "Postprocessing workflow for HBN data"
 authors = ["Tristan Kuehn <tkuehn@uwo.ca>", "Jessica Lammert <jlammert@uwo.ca>"]
 readme = "README.md"
