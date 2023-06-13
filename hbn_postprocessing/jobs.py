@@ -8,7 +8,7 @@ import pandas as pd
 from hbn_postprocessing.utils import glob_dir
 
 STARTED_THRESHOLD_KB = 10
-COMPLETED_THRESHOLD_KB = 400
+COMPLETED_THRESHOLD_KB = 4000
 
 
 def _process_job_file(file_: Path) -> dict[str, str | float]:
