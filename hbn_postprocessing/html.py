@@ -29,11 +29,9 @@ def check_html(
     matches[matches["html"] == "no"].to_csv(
         out_path / "html-check_no.csv",
         sep=",",
-        index=False,
     )
     matches[matches["html"] == "yes"].to_csv(
         out_path / "html-check_yes.csv",
         sep=",",
-        index=False,
     )
     return matches
