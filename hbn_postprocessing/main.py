@@ -33,9 +33,21 @@ def main() -> None:
     )
     out_size_df = check_jobs(args.jobs_dir, args.out_dir)
     motion_outliers_df = exclude_by_motion(args.fmriprep_dir, args.out_dir)
-    file_count_df.join(
-        [html_check_df, out_size_df, motion_outliers_df], how="outer",
-    ).to_csv(
+    overall_df = file_count_df.join(
+        [html_check_df, out_size_df, motion_outliers_df],
+        how="outer",
+    )
+    complete = (
+        (overall_df["fmap"] == "yes")
+        & (overall_df["func"] == "yes")
+        & (overall_df["t1"] == "yes")
+        & (overall_df["html"] == "yes")
+        & (overall_df["status"] == "likely complete")
+        & (~overall_df["movieTP_is_outlier"].astype(bool))
+    )
+    overall_df[complete].to_csv(Path(args.out_dir) / "overall_complete.csv", sep=",")
+    overall_df[~complete].to_csv(Path(args.out_dir) / "overall_incomplete.csv", sep=",")
+    overall_df.to_csv(
         Path(args.out_dir) / "overall_summary.csv",
         sep=",",
     )
