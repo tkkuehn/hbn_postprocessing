@@ -26,12 +26,9 @@ def check_html(
     ).set_index("participant_id")
     out_path = Path(out_dir)
     matches.to_csv(out_path / "html-check_all.csv", sep=",")
-    no_html = matches[matches["html"] == "no"]
-    no_html.to_csv(
-    #matches[matches["html"] == "no"].to_csv(
+    matches[matches["html"] == "no"].to_csv(
         out_path / "html-check_no.csv",
         sep=",",
-        index=False,
     )
     yes_html = matches[matches["html"] == "yes"]
     yes_html.to_csv(
